@@ -7,26 +7,27 @@ from pathlib import Path
 import secrets
 import pandas as pd
 
-# Determine the correct .env file path
-env_path = Path('.env.local') if Path('.env.local').exists() else Path('.env')
-print(f"Loading {env_path} file")
+# Function to load environment variables from .env file
+def load_env():
+    env_path = Path('.env.local') if Path('.env.local').exists() else Path('.env')
+    print(f"Loading {env_path} file")
+    return dotenv_values(dotenv_path=env_path)
 
-# Load environment variables into a dictionary
-env_vars = dotenv_values(dotenv_path=env_path)
-
-# Debug function to print environment variables
-def print_env_vars():
+# Function to print loaded environment variables
+def print_env_vars(env_vars):
     print("Environment variables after loading:")
     for key, value in env_vars.items():
         print(f"{key}: {value}")
 
-print_env_vars()  # Print environment variables after loading
+# Load environment variables
+env_vars = load_env()
+print_env_vars(env_vars)  # Print environment variables after loading
 
-# Flask app setup
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(16))
 
-# LinkedIn OAuth credentials
+# OAuth credentials
 CLIENT_ID = env_vars.get('CLIENT_ID')
 CLIENT_SECRET = env_vars.get('CLIENT_SECRET')
 REDIRECT_URI = 'http://127.0.0.1:5000/login/authorized'
@@ -57,6 +58,7 @@ def load_user(user_id):
 def unauthorized():
     return "Unauthorized!", 403
 
+# OAuth flow
 @app.route('/login')
 def login():
     params = {
@@ -141,10 +143,12 @@ def authorized():
 
     return redirect(url_for('user'))
 
+# Homepage route
 @app.route('/')
 def index():
     return render_template("index.html")
 
+# User profile route
 @app.route('/user')
 @login_required
 def user():
@@ -164,7 +168,7 @@ def user():
 
     return render_template('user.html', user_info=user_info, ads_accounts_html=ads_accounts_html)
 
-
+# Function to fetch ads accounts
 def get_ads_accounts(api_version, access_token):
     url = 'https://api.linkedin.com/rest/adAccounts?q=search&search=(type:(values:List(BUSINESS)),status:(values:List(ACTIVE)))'
     headers = {
@@ -189,6 +193,6 @@ def get_ads_accounts(api_version, access_token):
         print(response.text)
         return None
 
-
+# Run the Flask app
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
