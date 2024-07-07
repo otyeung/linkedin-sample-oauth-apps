@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This project sets up a basic Python Flask web application that allows users to log in using their LinkedIn member account through [OAuth 2.0 3-legged code flow](https://learn.microsoft.com/en-gb/linkedin/shared/authentication/authorization-code-flow?context=linkedin%2Fcontext&tabs=HTTPS1), retrieves authenticated user information and access token
+This project sets up a basic Python Flask web application that allows users to log in using their LinkedIn member account through [OAuth 2.0 3-legged code flow](https://learn.microsoft.com/en-gb/linkedin/shared/authentication/authorization-code-flow?context=linkedin%2Fcontext&tabs=HTTPS1), retrieves authenticated user information and ads accounts.
 
 MVP is meant to be a Minimum Viable Product (MVP) to validate a business idea with minimal resources and effort by releasing a basic version of the product that includes only the essential features (OAuth 2.0 workflow).
 
@@ -41,7 +41,7 @@ Developer is welcome to build on top of it to add more functionality and polish 
 8. Open Chrome web browser in incognito window (or clear all caches and cookies from linkedin.com, www.linkedin.com, 127.0.0.1)
    `http://127.0.0.1:5000/`
 
-The apps will print the current user information and access token in browser upon successful authentication.
+The apps will print the current user information and ads accounts in browser upon successful authentication.
 
 ## Limitations and Further Enhancements
 

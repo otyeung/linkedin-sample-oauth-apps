@@ -5,6 +5,7 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 from dotenv import dotenv_values
 from pathlib import Path
 import secrets
+import pandas as pd
 
 # Determine the correct .env file path
 env_path = Path('.env.local') if Path('.env.local').exists() else Path('.env')
@@ -63,14 +64,14 @@ def login():
         'client_id': CLIENT_ID,
         'redirect_uri': REDIRECT_URI,
         'state': 'UVFNwd5fGXGnQOt',  # Should be random for security reasons
-        'scope': 'r_liteprofile,r_emailaddress'  # Adjust scope based on your needs
+        'scope': 'r_liteprofile,r_emailaddress,rw_ads,r_ads'  # Adjust scope based on your needs
     }
     url = requests.Request('GET', AUTHORIZATION_URL, params=params).prepare().url
     return redirect(url)
 
 @app.route('/logout')
 def logout():
-    session.pop('linkedin_token', None)
+    session.pop('access_token', None)
     logout_user()
     return redirect(url_for('index'))
 
@@ -94,11 +95,15 @@ def authorized():
     if 'access_token' not in response_data:
         return "Failed to obtain access token.", 400
 
-    session['linkedin_token'] = response_data['access_token']
+    session['access_token'] = response_data['access_token']
+    session['expires_in'] = response_data['expires_in']
+    session['refresh_token'] = response_data['refresh_token']
+    session['refresh_token_expires_in'] = response_data['refresh_token_expires_in']
+    session['scope'] = response_data['scope']
 
     # Retrieve user profile data
     headers = {
-        'Authorization': f"Bearer {session['linkedin_token']}",
+        'Authorization': f"Bearer {session['access_token']}",
         'cache-control': 'no-cache',
         'X-Restli-Protocol-Version': '2.0.0',
         'LinkedIn-Version': API_VERSION
@@ -115,7 +120,7 @@ def authorized():
     last_name = profile_data['localizedLastName']
     email = email_data['elements'][0]['handle~']['emailAddress']
 
-    print(f"{user_id}, {first_name} {last_name}, Logged in with email: {email}")
+    print(f"{user_id}, {first_name} {last_name}, Logged in with email: {email}, expires in {session['expires_in']} seconds")
 
     user = User(user_id, first_name, last_name, email)
     login_user(user)
@@ -125,7 +130,13 @@ def authorized():
         'first_name': first_name,
         'last_name': last_name,
         'email': email,
-        'access_token': session['linkedin_token']
+        'access_token': session['access_token'],
+        'expires_in': session['expires_in'],
+        'expires_in_days': session['expires_in'] // 86400,
+        'refresh_token': session['refresh_token'],
+        'refresh_token_expires_in': session['refresh_token_expires_in'],
+        'refresh_token_expires_in_days': session['refresh_token_expires_in'] // 86400,
+        'scope': session['scope'],
     }
 
     return redirect(url_for('user'))
@@ -141,7 +152,43 @@ def user():
     if not user_info:
         return "User information not found.", 400
 
-    return render_template('user.html', user_info=user_info)
+    # Fetch the ads accounts
+    access_token = user_info['access_token']
+    api_version = API_VERSION
+    ads_accounts_df = get_ads_accounts(api_version, access_token)
+
+    if ads_accounts_df is not None:
+        ads_accounts_html = ads_accounts_df.to_html(index=False)
+    else:
+        ads_accounts_html = "Failed to retrieve ads accounts."
+
+    return render_template('user.html', user_info=user_info, ads_accounts_html=ads_accounts_html)
+
+
+def get_ads_accounts(api_version, access_token):
+    url = 'https://api.linkedin.com/rest/adAccounts?q=search&search=(type:(values:List(BUSINESS)),status:(values:List(ACTIVE)))'
+    headers = {
+        'LinkedIn-Version': api_version,
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        ads_accounts = [
+            {"id": account["id"], "name": account["name"]}
+            for account in data.get("elements", [])
+            if "id" in account and "name" in account
+        ]
+        df = pd.DataFrame(ads_accounts)
+        return df
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return None
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
